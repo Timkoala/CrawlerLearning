@@ -33,8 +33,23 @@ class CrawlerEngine:
         # Create a queue for communication
         result_queue = Queue()
         
+        # Initialize Flask app context to create a run record
+        run_id = None
+        try:
+            from app import create_app, db
+            from models.job import CrawlRun
+            flask_app = create_app()
+            with flask_app.app_context():
+                run = CrawlRun(job_id=job_id, status='running', max_depth=int(max_depth))
+                db.session.add(run)
+                db.session.commit()
+                run_id = run.id
+                self.logger.info(f"[Engine] Created run {run_id} for job {job_id}")
+        except Exception as e:
+            self.logger.error(f"[Engine] Failed to create run for job {job_id}: {e}")
+        
         # Start the crawl in a separate process
-        process = Process(target=self._run_spider, args=(job_id, target_url, max_depth, custom_rules, settings, result_queue))
+        process = Process(target=self._run_spider, args=(job_id, run_id, target_url, max_depth, custom_rules, settings, result_queue))
         process.start()
         
         self.logger.info(f"[Engine] Started process for job {job_id} with PID: {process.pid}")
@@ -43,12 +58,13 @@ class CrawlerEngine:
         self.processes[job_id] = {
             'process': process,
             'start_time': time.time(),
-            'result_queue': result_queue
+            'result_queue': result_queue,
+            'run_id': run_id
         }
         
         return job_id
     
-    def _run_spider(self, job_id, target_url, max_depth, custom_rules, settings, result_queue):
+    def _run_spider(self, job_id, run_id, target_url, max_depth, custom_rules, settings, result_queue):
         """Run the spider in a separate process"""
         try:
             # Configure logging for the spider process
@@ -60,6 +76,17 @@ class CrawlerEngine:
             
             self.logger = logging.getLogger(__name__)
             self.logger.info(f"[Engine] Process started for job {job_id}")
+            
+            # Initialize Flask app context in this process so SQLAlchemy works in pipelines
+            flask_app = None
+            try:
+                from app import create_app
+                flask_app = create_app()
+                app_ctx = flask_app.app_context()
+                app_ctx.push()
+                self.logger.info("[Engine] Flask app context pushed in spider process")
+            except Exception as e:
+                self.logger.error(f"[Engine] Failed to initialize Flask app context: {e}")
             
             # Configure Scrapy settings
             scrapy_settings = get_project_settings()
@@ -74,20 +101,53 @@ class CrawlerEngine:
             
             # Create and start the crawler process
             process = CrawlerProcess(scrapy_settings)
-            # 通过crawler.crawl()的参数方式传递所有必要参数
-            process.crawl(CustomSpider, job_id=job_id, target_url=target_url, max_depth=max_depth, custom_rules=custom_rules, name=f'spider_{job_id}')
+            process.crawl(CustomSpider, job_id=job_id, run_id=run_id, target_url=target_url, max_depth=max_depth, custom_rules=custom_rules, name=f'spider_{job_id}')
             
             self.logger.info(f"[Engine] Starting crawl process for job {job_id}")
             process.start()
             
             self.logger.info(f"[Engine] Crawl process finished for job {job_id}")
             
+            # Update run status to completed
+            try:
+                if flask_app and run_id:
+                    from app import db
+                    from models.job import CrawlRun
+                    with flask_app.app_context():
+                        run = db.session.get(CrawlRun, run_id)
+                        if run:
+                            run.status = 'completed'
+                            run.ended_at = __import__('datetime').datetime.utcnow()
+                            db.session.commit()
+            except Exception as e:
+                self.logger.error(f"[Engine] Failed to update run status: {e}")
+            
             # Send success message
             result_queue.put(('success', f'Job {job_id} completed successfully'))
         except Exception as e:
             self.logger.error(f"[Engine] Error in job {job_id}: {str(e)}")
+            # Update run to failed
+            try:
+                if 'flask_app' in locals() and flask_app and run_id:
+                    from app import db
+                    from models.job import CrawlRun
+                    with flask_app.app_context():
+                        run = db.session.get(CrawlRun, run_id)
+                        if run:
+                            run.status = 'failed'
+                            run.ended_at = __import__('datetime').datetime.utcnow()
+                            db.session.commit()
+            except Exception:
+                pass
             # Send error message
             result_queue.put(('error', str(e)))
+        finally:
+            # Pop Flask app context if it was pushed
+            try:
+                if 'app_ctx' in locals():
+                    app_ctx.pop()
+            except Exception:
+                pass
     
     def stop_crawl(self, job_id):
         """Stop a running crawl job"""
@@ -101,6 +161,22 @@ class CrawlerEngine:
             process.terminate()
             process.join()
             
+        # Update run status to stopped
+        run_id = self.processes[job_id].get('run_id')
+        try:
+            from app import create_app, db
+            from models.job import CrawlRun
+            flask_app = create_app()
+            with flask_app.app_context():
+                if run_id:
+                    run = db.session.get(CrawlRun, run_id)
+                    if run:
+                        run.status = 'stopped'
+                        run.ended_at = __import__('datetime').datetime.utcnow()
+                        db.session.commit()
+        except Exception:
+            pass
+        
         del self.processes[job_id]
         
     def get_job_status(self, job_id):

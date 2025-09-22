@@ -22,7 +22,8 @@ class ProcessManager:
             
         # Create spider settings
         settings = {
-            'MAX_DEPTH': max_depth
+            'MAX_DEPTH': max_depth,
+            'DEPTH_LIMIT': int(max_depth)
         }
         
         # Parse custom rules if they exist

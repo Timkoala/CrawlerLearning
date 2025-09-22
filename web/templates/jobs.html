@@ -18,12 +18,13 @@
                     
                     <div class="mb-3">
                         <label for="target-url" class="form-label">目标URL</label>
-                        <input type="url" class="form-control" id="target-url" required>
+                        <input type="url" class="form-control" id="target-url" required placeholder="例如: https://www.example.com/article/123">
                     </div>
                     
                     <div class="mb-3">
                         <label for="depth" class="form-label">爬取深度</label>
                         <input type="number" class="form-control" id="depth" value="1" min="1">
+                        <div class="form-text">深度=1 仅抓取起始页面；深度=2 跟进起始页的链接一层；以此类推。</div>
                     </div>
                     
                     <div class="card mb-3">
@@ -31,19 +32,23 @@
                             <h6>自定义爬取规则</h6>
                         </div>
                         <div class="card-body">
+                            <div class="mb-2 text-muted small">
+                                说明：CSS 选择器用于定位页面元素，支持 ::text 提取文本；多个段落可用多个选择器或通配选择器匹配并自动拼接。
+                            </div>
                             <div class="mb-3">
                                 <label for="title-selector" class="form-label">标题选择器 (CSS选择器)</label>
-                                <input type="text" class="form-control" id="title-selector" placeholder="例如: h1.title::text">
+                                <input type="text" class="form-control" id="title-selector" placeholder="例如: h1.title::text 或 meta[property='og:title']::attr(content)">
                             </div>
                             
                             <div class="mb-3">
                                 <label for="content-selector" class="form-label">内容选择器 (CSS选择器)</label>
-                                <input type="text" class="form-control" id="content-selector" placeholder="例如: .content p::text">
+                                <input type="text" class="form-control" id="content-selector" placeholder="例如: .article-content p::text 或 div.story-content p::text">
                             </div>
                             
                             <div class="mb-3">
                                 <label for="custom-fields" class="form-label">自定义字段</label>
-                                <textarea class="form-control" id="custom-fields" rows="3" placeholder="格式: 字段名=CSS选择器&#10;例如:&#10;author=.author-name::text&#10;date=.publish-date::text"></textarea>
+                                <textarea class="form-control" id="custom-fields" rows="3" placeholder="格式: 字段名=CSS选择器\n例如:\nauthor=.author-name::text\ndate=.publish-date::text\nsource=meta[name='og:site_name']::attr(content)"></textarea>
+                                <div class="form-text">常用伪类：::text 获取文本；::attr(href) 获取链接；用空格分隔层级，如 .content p::text。</div>
                             </div>
                         </div>
                     </div>
@@ -58,31 +63,10 @@
                 <h5>预定义任务</h5>
             </div>
             <div class="card-body">
-                <h6>菲律宾主要网站</h6>
-                <div class="list-group mb-3">
-                    <button type="button" class="list-group-item list-group-item-action" onclick="loadPresetTask('Philippines Government', 'https://www.gov.ph')">
-                        菲律宾政府官网
-                    </button>
-                    <button type="button" class="list-group-item list-group-item-action" onclick="loadPresetTask('Philippines News', 'https://www.inquirer.net')">
-                        菲律宾每日询问者
-                    </button>
-                    <button type="button" class="list-group-item list-group-item-action" onclick="loadPresetTask('Philippines Social', 'https://www.facebook.com')">
-                        Facebook
-                    </button>
+                <div id="preset-accordion" class="accordion">
+                    <!-- 动态渲染分组卡片 -->
                 </div>
-                
-                <h6>新加坡主要网站</h6>
-                <div class="list-group">
-                    <button type="button" class="list-group-item list-group-item-action" onclick="loadPresetTask('Singapore Government', 'https://www.gov.sg')">
-                        新加坡政府官网
-                    </button>
-                    <button type="button" class="list-group-item list-group-item-action" onclick="loadPresetTask('Singapore News', 'https://www.straitstimes.com')">
-                        海峡时报
-                    </button>
-                    <button type="button" class="list-group-item list-group-item-action" onclick="loadPresetTask('Singapore Social', 'https://www.facebook.com')">
-                        Facebook
-                    </button>
-                </div>
+                <div class="text-muted small mt-2">提示：点击预置项会填充上方表单（任务名称含中文描述），您可进一步修改选择器后保存。</div>
             </div>
         </div>
     </div>
@@ -100,7 +84,6 @@
                     </select>
                 </div>
                 
-                <!-- 显示选中任务的URL和爬取规则 -->
                 <div class="card mb-3" id="selected-job-details" style="display: none;">
                     <div class="card-header">
                         <h6>任务详情</h6>
@@ -135,35 +118,12 @@
                     </div>
                     <div class="card-body">
                         <div id="crawl-status" style="height: 300px; overflow-y: auto; font-family: monospace; font-size: 0.9em;">
-                            <!-- 爬取状态将在这里显示 -->
                             <p class="text-muted">请选择任务并点击"开始爬取"按钮</p>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
-    </div>
-</div>
-
-<div class="card">
-    <div class="card-header">
-        <h5>任务列表</h5>
-    </div>
-    <div class="card-body">
-        <table class="table table-striped">
-            <thead>
-                <tr>
-                    <th>任务名称</th>
-                    <th>目标URL</th>
-                    <th>爬取深度</th>
-                    <th>状态</th>
-                    <th>操作</th>
-                </tr>
-            </thead>
-            <tbody id="jobs-table">
-                <!-- 任务将在这里显示 -->
-            </tbody>
-        </table>
     </div>
 </div>
 {% endblock %}

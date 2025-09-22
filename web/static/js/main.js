@@ -60,9 +60,20 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
     
+    // Results page: setup filters and initial load
+    const filterForm = document.getElementById('filter-form');
+    if (filterForm) {
+        filterForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            resultsState.page = 1; // reset to first page
+            loadResults();
+        });
+    }
+    
     // Load initial data
     loadJobs();
     loadResults();
+    loadPresets();
 });
 
 function loadPresetTask(name, url) {
@@ -71,77 +82,70 @@ function loadPresetTask(name, url) {
 }
 
 function saveCrawlJob() {
-    // Get form values
     const name = document.getElementById('name').value;
     const url = document.getElementById('target-url').value;
     const depth = document.getElementById('depth').value;
-    
-    // Get custom rules
     const titleSelector = document.getElementById('title-selector').value;
     const contentSelector = document.getElementById('content-selector').value;
     const customFieldsText = document.getElementById('custom-fields').value;
-    
+    const editingJobId = document.getElementById('editing-job-id') ? document.getElementById('editing-job-id').value : '';
+
     if (!name || !url) {
         alert('请填写任务名称和目标URL');
         return;
     }
-    
-    // Prepare custom rules
+
     let customRules = {};
     if (titleSelector || contentSelector || customFieldsText) {
-        customRules = {
-            title_selector: titleSelector,
-            content_selector: contentSelector
-        };
-        
-        // Parse custom fields
+        customRules = { title_selector: titleSelector, content_selector: contentSelector };
         if (customFieldsText) {
             const customFields = {};
             const lines = customFieldsText.split('\n');
             lines.forEach(line => {
                 const trimmedLine = line.trim();
                 if (trimmedLine && trimmedLine.includes('=')) {
-                    const [fieldName, selector] = trimmedLine.split('=');
-                    if (fieldName && selector) {
-                        customFields[fieldName.trim()] = selector.trim();
-                    }
+                    const idx = trimmedLine.indexOf('=');
+                    const fieldName = trimmedLine.slice(0, idx).trim();
+                    const selector = trimmedLine.slice(idx + 1).trim();
+                    if (fieldName && selector) customFields[fieldName] = selector;
                 }
             });
-            if (Object.keys(customFields).length > 0) {
-                customRules.custom_fields = customFields;
-            }
+            if (Object.keys(customFields).length > 0) customRules.custom_fields = customFields;
         }
     }
-    
-    // Make API call to save the job
-    fetch('/api/jobs', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-API-Key': 'default-key'  // Fixed API key
-        },
-        body: JSON.stringify({
-            name: name,
-            target_url: url,
-            max_depth: parseInt(depth),
-            custom_rules: Object.keys(customRules).length > 0 ? customRules : null
-        })
+
+    const payload = JSON.stringify({
+        name: name,
+        target_url: url,
+        max_depth: parseInt(depth),
+        custom_rules: Object.keys(customRules).length > 0 ? customRules : null
+    });
+
+    const isEdit = editingJobId && editingJobId !== '';
+    const endpoint = isEdit ? `/api/jobs/${editingJobId}` : '/api/jobs';
+    const method = isEdit ? 'PUT' : 'POST';
+
+    fetch(endpoint, {
+        method: method,
+        headers: { 'Content-Type': 'application/json', 'X-API-Key': 'default-key' },
+        body: payload
     })
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            alert('爬虫任务保存成功！');
-            // Reset form
+            alert(isEdit ? '任务更新成功！' : '爬虫任务保存成功！');
             document.getElementById('crawl-form').reset();
-            // Reload jobs list
+            if (document.getElementById('editing-job-id')) document.getElementById('editing-job-id').value = '';
+            const saveBtn = document.querySelector('#crawl-form button[type="submit"]');
+            if (saveBtn) saveBtn.textContent = '保存任务';
             loadJobs();
         } else {
-            alert('保存任务失败: ' + data.error);
+            alert((isEdit ? '更新任务失败: ' : '保存任务失败: ') + data.error);
         }
     })
     .catch(error => {
         console.error('Error saving job:', error);
-        alert('保存任务时发生错误');
+        alert(isEdit ? '更新任务时发生错误' : '保存任务时发生错误');
     });
 }
 
@@ -288,15 +292,10 @@ function saveSettings(formId) {
 }
 
 function loadJobs() {
-    // Make API call to get jobs
-    fetch('/api/jobs', {
-        headers: {
-            'X-API-Key': 'default-key'  // Fixed API key
-        }
-    })
+    const prevSelected = document.getElementById('selected-job') ? document.getElementById('selected-job').value : '';
+    fetch('/api/jobs', { headers: { 'X-API-Key': 'default-key' }})
     .then(response => response.json())
     .then(jobs => {
-        // Update jobs table
         const jobsTable = document.getElementById('jobs-table');
         if (jobsTable) {
             if (jobs.length === 0) {
@@ -318,61 +317,23 @@ function loadJobs() {
                 });
             }
         }
-        
-        // Update job selection dropdown
         const selectedJobSelect = document.getElementById('selected-job');
         if (selectedJobSelect) {
+            const old = selectedJobSelect.value;
             selectedJobSelect.innerHTML = '<option value="">请选择任务</option>';
             jobs.forEach(job => {
                 const option = document.createElement('option');
-                option.value = job.id;
-                option.textContent = `${job.name} (${job.target_url})`;
+                option.value = job.id; option.textContent = `${job.name} (${job.target_url})`;
                 selectedJobSelect.appendChild(option);
             });
-            
-            // 如果有任务，默认选择第一个
-            if (jobs.length > 0) {
-                selectedJobSelect.value = jobs[0].id;
-                loadJobDetails(jobs[0].id);
+            // 恢复之前的选择
+            if (prevSelected && jobs.some(j=>String(j.id) === String(prevSelected))) {
+                selectedJobSelect.value = prevSelected;
+                loadJobDetails(prevSelected);
             }
         }
     })
-    .catch(error => {
-        console.error('Error loading jobs:', error);
-        // Fallback to simulated data
-        const jobsTable = document.getElementById('jobs-table');
-        const selectedJobSelect = document.getElementById('selected-job');
-        
-        if (jobsTable) {
-            jobsTable.innerHTML = `
-                <tr>
-                    <td>示例任务1</td>
-                    <td>https://example.com</td>
-                    <td>1</td>
-                    <td>已保存</td>
-                    <td>
-                        <button class="btn btn-sm btn-danger">删除</button>
-                    </td>
-                </tr>
-                <tr>
-                    <td>示例任务2</td>
-                    <td>https://news.example.com</td>
-                    <td>2</td>
-                    <td>已保存</td>
-                    <td>
-                        <button class="btn btn-sm btn-danger">删除</button>
-                    </td>
-                </tr>
-            `;
-        }
-        
-        // Populate job selection dropdown
-        if (selectedJobSelect) {
-            selectedJobSelect.innerHTML = '<option value="">请选择任务</option>';
-            selectedJobSelect.innerHTML += '<option value="1">示例任务1 (https://example.com)</option>';
-            selectedJobSelect.innerHTML += '<option value="2">示例任务2 (https://news.example.com)</option>';
-        }
-    });
+    .catch(error => { console.error('Error loading jobs:', error); });
 }
 
 function loadJobDetails(jobId) {
@@ -430,33 +391,18 @@ function loadJobDetails(jobId) {
 
 function editSelectedJob() {
     const jobId = document.getElementById('selected-job').value;
-    if (!jobId) {
-        alert('请选择一个任务');
-        return;
-    }
-    
-    // Make API call to get job details
-    fetch(`/api/jobs/${jobId}`, {
-        headers: {
-            'X-API-Key': 'default-key'  // Fixed API key
-        }
-    })
-    .then(response => response.json())
-    .then(job => {
-        // Populate form with job details
+    if (!jobId) { alert('请选择一个任务'); return; }
+    fetch(`/api/jobs/${jobId}`, { headers: { 'X-API-Key': 'default-key' }})
+    .then(r=>r.json())
+    .then(job=>{
         document.getElementById('name').value = job.name;
         document.getElementById('target-url').value = job.target_url;
         document.getElementById('depth').value = job.max_depth;
-        
-        // Parse custom rules if they exist
         if (job.custom_rules) {
             try {
                 const customRules = typeof job.custom_rules === 'string' ? JSON.parse(job.custom_rules) : job.custom_rules;
-                
                 document.getElementById('title-selector').value = customRules.title_selector || '';
                 document.getElementById('content-selector').value = customRules.content_selector || '';
-                
-                // Populate custom fields textarea
                 if (customRules.custom_fields && Object.keys(customRules.custom_fields).length > 0) {
                     let customFieldsText = '';
                     for (const [field, selector] of Object.entries(customRules.custom_fields)) {
@@ -466,27 +412,25 @@ function editSelectedJob() {
                 } else {
                     document.getElementById('custom-fields').value = '';
                 }
-            } catch (e) {
-                console.error('Error parsing custom rules:', e);
-                // Clear form fields on error
-                document.getElementById('title-selector').value = '';
-                document.getElementById('content-selector').value = '';
-                document.getElementById('custom-fields').value = '';
-            }
+            } catch { document.getElementById('custom-fields').value = ''; }
         } else {
-            // Clear custom rules fields
             document.getElementById('title-selector').value = '';
             document.getElementById('content-selector').value = '';
             document.getElementById('custom-fields').value = '';
         }
-        
-        // Scroll to form
+        if (!document.getElementById('editing-job-id')) {
+            const hidden = document.createElement('input');
+            hidden.type = 'hidden'; hidden.id = 'editing-job-id'; hidden.value = job.id;
+            hidden.name = 'editing_job_id';
+            document.getElementById('crawl-form').appendChild(hidden);
+        } else {
+            document.getElementById('editing-job-id').value = job.id;
+        }
+        const saveBtn = document.querySelector('#crawl-form button[type="submit"]');
+        if (saveBtn) saveBtn.textContent = '更新任务';
         document.getElementById('crawl-form').scrollIntoView({ behavior: 'smooth' });
     })
-    .catch(error => {
-        console.error('Error loading job for editing:', error);
-        alert('加载任务详情时发生错误');
-    });
+    .catch(()=>alert('加载任务详情时发生错误'));
 }
 
 function deleteJob(jobId) {
@@ -517,57 +461,400 @@ function deleteJob(jobId) {
     });
 }
 
-function loadResults() {
-    // Make API call to get results
-    fetch('/api/results', {
-        headers: {
-            'X-API-Key': 'default-key'  // Fixed API key
-        }
+// ---- Results pagination & filtering ----
+const resultsState = {
+    page: 1,
+    page_size: 10,
+    job_id: '',
+    run_id: '',
+    q: ''
+};
+
+function readResultsFilters() {
+    const jobFilter = document.getElementById('job-filter');
+    const runFilter = document.getElementById('run-filter');
+    const searchFilter = document.getElementById('search-filter');
+    resultsState.job_id = jobFilter ? jobFilter.value : '';
+    resultsState.run_id = runFilter ? runFilter.value : '';
+    resultsState.q = searchFilter ? searchFilter.value.trim() : '';
+}
+
+function loadRuns() {
+    const runFilter = document.getElementById('run-filter');
+    if (!runFilter) return;
+    const params = new URLSearchParams();
+    if (resultsState.job_id) params.set('job_id', resultsState.job_id);
+    fetch(`/api/runs?${params.toString()}`, { headers: { 'X-API-Key': 'default-key' }})
+    .then(r=>r.json())
+    .then(runs=>{
+        const prev = runFilter.value;
+        runFilter.innerHTML = '<option value="">所有批次</option>';
+        runs.forEach(run=>{
+            const opt = document.createElement('option');
+            const label = `#${run.id} · ${run.status} · ${run.started_at ? run.started_at.replace('T',' ') : ''}`;
+            opt.value = run.id; opt.textContent = label;
+            runFilter.appendChild(opt);
+        });
+        if (prev && [...runFilter.options].some(o=>o.value === prev)) runFilter.value = prev;
     })
+    .catch(()=>{ runFilter.innerHTML = '<option value="">所有批次</option>'; });
+}
+
+function loadResults() {
+    const resultsTable = document.getElementById('results-table');
+    if (!resultsTable) return;
+    readResultsFilters();
+
+    const params = new URLSearchParams();
+    params.set('page', String(resultsState.page));
+    params.set('page_size', String(resultsState.page_size));
+    if (resultsState.job_id) params.set('job_id', resultsState.job_id);
+    if (resultsState.run_id) params.set('run_id', resultsState.run_id);
+    if (resultsState.q) params.set('q', resultsState.q);
+
+    fetch(`/api/results?${params.toString()}`, { headers: { 'X-API-Key': 'default-key' }})
     .then(response => response.json())
-    .then(results => {
-        // Update results table
-        const resultsTable = document.getElementById('results-table');
-        if (resultsTable) {
-            if (results.length === 0) {
-                resultsTable.innerHTML = '<tr><td colspan="5" class="text-center">暂无结果</td></tr>';
-            } else {
-                resultsTable.innerHTML = '';
-                results.forEach(result => {
-                    const row = document.createElement('tr');
-                    row.innerHTML = `
-                        <td>任务${result.job_id}</td>
-                        <td>${result.url}</td>
-                        <td>${result.title || '无标题'}</td>
-                        <td>${result.content ? result.content.substring(0, 50) + '...' : '无内容'}</td>
-                        <td>${result.scraped_at || ''}</td>
-                    `;
-                    resultsTable.appendChild(row);
-                });
-            }
-        }
+    .then(payload => {
+        renderResults(payload.items || []);
+        renderResultsMeta(payload.total, payload.page, payload.page_size);
+        renderResultsPagination(payload.total, payload.page, payload.page_size);
+        bindSelectionControls();
+        loadRuns();
     })
     .catch(error => {
         console.error('Error loading results:', error);
-        // Fallback to simulated data
-        const resultsTable = document.getElementById('results-table');
-        if (resultsTable) {
-            resultsTable.innerHTML = `
-                <tr>
-                    <td>示例任务1</td>
-                    <td>https://example.com/page1</td>
-                    <td>示例页面1</td>
-                    <td>{ "title": "示例页面1", "content": "这是示例内容" }</td>
-                    <td>2023-01-01 12:00:00</td>
-                </tr>
-                <tr>
-                    <td>示例任务1</td>
-                    <td>https://example.com/page2</td>
-                    <td>示例页面2</td>
-                    <td>{ "title": "示例页面2", "content": "这是另一个示例" }</td>
-                    <td>2023-01-01 12:05:00</td>
-                </tr>
-            `;
+        resultsTable.innerHTML = '<tr><td colspan="7" class="text-center">加载结果失败</td></tr>';
+        const pagination = document.getElementById('results-pagination');
+        if (pagination) pagination.innerHTML = '';
+        const meta = document.getElementById('results-meta');
+        if (meta) meta.textContent = '';
+    });
+}
+
+function renderResults(items) {
+    const resultsTable = document.getElementById('results-table');
+    resultsTable.innerHTML = '';
+    if (!items || items.length === 0) {
+        resultsTable.innerHTML = '<tr><td colspan="7" class="text-center">暂无结果</td></tr>';
+        return;
+    }
+
+    items.forEach(result => {
+        const row = document.createElement('tr');
+        const previewData = JSON.stringify(result, null, 2);
+        const singleJson = encodeURIComponent(previewData);
+        row.innerHTML = `
+            <td><input type="checkbox" class="row-check" data-id="${result.id}"></td>
+            <td>任务${result.job_id}${result.run_id ? ` / 批次#${result.run_id}` : ''}</td>
+            <td>${result.url}</td>
+            <td>${result.title || '无标题'}</td>
+            <td>${result.content ? result.content.substring(0, 50) + '...' : '无内容'}</td>
+            <td>${result.scraped_at || ''}</td>
+            <td>
+                <div class="btn-group btn-group-sm" role="group">
+                    <button class="btn btn-outline-primary" onclick='previewResult(${JSON.stringify(result).replace(/'/g, "&#39;")})'>预览</button>
+                    <button class="btn btn-outline-secondary" onclick='copyResult(${JSON.stringify(result).replace(/'/g, "&#39;")})'>复制</button>
+                    <a class="btn btn-outline-success" href="data:application/json;charset=utf-8,${singleJson}" download="result_${result.id || ''}.json">下载</a>
+                    <button class="btn btn-outline-danger" onclick='deleteResult(${result.id})'>删除</button>
+                </div>
+            </td>
+        `;
+        resultsTable.appendChild(row);
+    });
+}
+
+function resetAndAddListenerById(id, event, handler) {
+    const el = document.getElementById(id);
+    if (!el) return null;
+    const clone = el.cloneNode(true);
+    el.parentNode.replaceChild(clone, el);
+    clone.addEventListener(event, handler);
+    return clone;
+}
+
+function bindSelectionControls() {
+    resetAndAddListenerById('select-all', 'change', () => {
+        const selectAllCb = document.getElementById('select-all');
+        document.querySelectorAll('#results-table .row-check').forEach(cb => { cb.checked = !!(selectAllCb && selectAllCb.checked); });
+    });
+
+    resetAndAddListenerById('btn-delete-selected', 'click', () => {
+        const ids = [...document.querySelectorAll('#results-table .row-check:checked')].map(cb => parseInt(cb.getAttribute('data-id')));
+        if (ids.length === 0) { alert('请选择要删除的记录'); return; }
+        if (!confirm(`确定删除已选的 ${ids.length} 条记录吗？`)) return;
+        document.querySelectorAll('#results-table .row-check:checked').forEach(cb => { const tr = cb.closest('tr'); if (tr) tr.parentNode.removeChild(tr); });
+        fetch('/api/results/batch_delete', {
+            method: 'POST', headers: { 'Content-Type': 'application/json', 'X-API-Key': 'default-key' }, body: JSON.stringify({ ids })
+        }).then(r=>r.json()).then(res=>{ const selectAll = document.getElementById('select-all'); if (selectAll) selectAll.checked = false; loadResults(); })
+        .catch(()=>{ alert('删除失败'); loadResults(); });
+    });
+
+    resetAndAddListenerById('btn-delete-run', 'click', () => {
+        const runFilter = document.getElementById('run-filter');
+        const runId = runFilter ? runFilter.value : '';
+        if (!runId) { alert('请先选择批次'); return; }
+        if (!confirm('确定删除当前批次的所有结果吗？')) return;
+        fetch('/api/results/batch_delete', {
+            method: 'POST', headers: { 'Content-Type': 'application/json', 'X-API-Key': 'default-key' }, body: JSON.stringify({ run_id: parseInt(runId) })
+        }).then(r=>r.json()).then(res=>{ const selectAll = document.getElementById('select-all'); if (selectAll) selectAll.checked = false; loadRuns(); loadResults(); })
+        .catch(()=>alert('删除失败'));
+    });
+
+    // 预览全部
+    resetAndAddListenerById('btn-preview-run', 'click', () => {
+        const runId = document.getElementById('run-filter')?.value || '';
+        if (!runId) { alert('请先选择批次'); return; }
+        const params = new URLSearchParams(); params.set('run_id', runId);
+        fetch(`/api/results/export?format=json&${params.toString()}`, { headers: { 'X-API-Key': 'default-key' }})
+        .then(r=>r.json()).then(list=>{ previewResult(list); }).catch(()=>alert('预览失败'));
+    });
+
+    // 下载全部
+    resetAndAddListenerById('btn-download-run', 'click', () => {
+        const runId = document.getElementById('run-filter')?.value || '';
+        if (!runId) { alert('请先选择批次'); return; }
+        const a = document.createElement('a');
+        a.href = `/api/results/export?format=json&run_id=${encodeURIComponent(runId)}`;
+        a.download = `run_${runId}.json`;
+        a.target = '_blank';
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    });
+}
+
+// 在筛选变更时加载批次
+(function bindFilters(){
+    const jobFilter = document.getElementById('job-filter');
+    if (jobFilter) {
+        jobFilter.addEventListener('change', ()=>{ resultsState.page = 1; loadRuns(); loadResults(); });
+    }
+    const runFilter = document.getElementById('run-filter');
+    if (runFilter) {
+        runFilter.addEventListener('change', ()=>{ resultsState.page = 1; loadResults(); });
+    }
+})();
+
+function deleteResult(id) {
+    if (!id) return;
+    if (!confirm('确定删除该条结果吗？')) return;
+    fetch(`/api/results/${id}`, {
+        method: 'DELETE',
+        headers: { 'X-API-Key': 'default-key' }
+    }).then(r=>r.json()).then(data=>{
+        const selectAll = document.getElementById('select-all');
+        if (selectAll) selectAll.checked = false;
+        if (data.success) {
+            loadResults();
+        } else {
+            alert('删除失败');
         }
+    }).catch(()=>alert('删除失败'));
+}
+
+function renderResultsMeta(total, page, page_size) {
+    const meta = document.getElementById('results-meta');
+    if (!meta) return;
+    const start = total === 0 ? 0 : (page - 1) * page_size + 1;
+    const end = Math.min(page * page_size, total);
+    meta.textContent = `共 ${total} 条，显示第 ${start}-${end} 条`;
+}
+
+function renderResultsPagination(total, page, page_size) {
+    const pagination = document.getElementById('results-pagination');
+    if (!pagination) return;
+
+    pagination.innerHTML = '';
+    const totalPages = Math.max(1, Math.ceil(total / page_size));
+
+    function createPageItem(label, targetPage, disabled = false, active = false) {
+        const li = document.createElement('li');
+        li.className = `page-item${disabled ? ' disabled' : ''}${active ? ' active' : ''}`;
+        const a = document.createElement('a');
+        a.className = 'page-link';
+        a.href = '#';
+        a.textContent = label;
+        if (!disabled && !active) {
+            a.addEventListener('click', (e) => {
+                e.preventDefault();
+                resultsState.page = targetPage;
+                loadResults();
+            });
+        }
+        li.appendChild(a);
+        return li;
+    }
+
+    // Prev
+    pagination.appendChild(createPageItem('上一页', Math.max(1, page - 1), page === 1));
+
+    // Page numbers (simple window)
+    const windowSize = 5;
+    const start = Math.max(1, page - Math.floor(windowSize / 2));
+    const end = Math.min(totalPages, start + windowSize - 1);
+    for (let p = start; p <= end; p++) {
+        pagination.appendChild(createPageItem(String(p), p, false, p === page));
+    }
+
+    // Next
+    pagination.appendChild(createPageItem('下一页', Math.min(totalPages, page + 1), page === totalPages));
+}
+
+function previewResult(obj) {
+    try {
+        const modalEl = document.getElementById('previewModal');
+        const pre = document.getElementById('previewContent');
+        pre.textContent = JSON.stringify(obj, null, 2);
+        const modal = new bootstrap.Modal(modalEl);
+        modal.show();
+    } catch (e) {
+        alert('无法预览该结果');
+    }
+}
+
+function copyResult(obj) {
+    const text = JSON.stringify(obj, null, 2);
+    navigator.clipboard.writeText(text).then(()=>{
+        alert('已复制到剪贴板');
+    }).catch(()=>{
+        // 兼容回退
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        document.body.appendChild(ta);
+        ta.select();
+        try { document.execCommand('copy'); alert('已复制到剪贴板'); } catch(e) { alert('复制失败'); }
+        document.body.removeChild(ta);
+    });
+}
+
+// augment status updates to refresh results and jobs list upon completion/stop
+(function augmentStatusUI(){
+    const originalUpdateCrawlStatus = window.updateCrawlStatus;
+    window.updateCrawlStatus = function(jobId){
+        const statusDiv = document.getElementById('crawl-status');
+        const badge = document.createElement('span');
+        badge.className = 'badge bg-secondary ms-2';
+        badge.id = 'job-status-badge';
+        // ensure exists
+        if (statusDiv && !document.getElementById('job-status-badge')) {
+            statusDiv.parentElement.parentElement.querySelector('.card-header h6')?.appendChild(badge);
+        }
+        function setBadge(text, cls){
+            const b = document.getElementById('job-status-badge');
+            if (!b) return;
+            b.className = `badge ${cls} ms-2`;
+            b.textContent = text;
+        }
+        const interval = setInterval(() => {
+            fetch(`/api/jobs/${jobId}`, { headers: { 'X-API-Key': 'default-key' }})
+            .then(r=>r.json())
+            .then(job=>{
+                if (job.status === 'running') setBadge('运行中', 'bg-info');
+                if (job.status === 'completed' || job.status === 'finished') {
+                    setBadge('已完成', 'bg-success');
+                    clearInterval(interval);
+                    // refresh results and jobs list
+                    loadResults();
+                    loadJobs();
+                }
+                if (job.status === 'failed') {
+                    setBadge('失败', 'bg-danger');
+                    clearInterval(interval);
+                    loadJobs();
+                }
+                if (job.status === 'stopped') {
+                    setBadge('已停止', 'bg-warning text-dark');
+                    clearInterval(interval);
+                    loadJobs();
+                }
+            })
+            .catch(()=>{ clearInterval(interval); });
+        }, 3000);
+        // call original to keep existing behavior
+        try { originalUpdateCrawlStatus(jobId); } catch(e) {}
+    }
+})();
+
+function loadPresets() {
+    const acc = document.getElementById('preset-accordion');
+    const simpleList = document.getElementById('preset-list');
+    const container = acc || simpleList;
+    if (!container) return;
+    fetch('/api/sites', { headers: { 'X-API-Key': 'default-key' }})
+    .then(r=>r.json())
+    .then(sites=>{
+        // 分组：country + category
+        const groups = {};
+        sites.forEach(s=>{
+            const key = `${s.country} | ${s.category}`;
+            if (!groups[key]) groups[key] = [];
+            groups[key].push(s);
+        });
+        if (acc) acc.innerHTML = '';
+        Object.entries(groups).forEach(([key, items], idx)=>{
+            if (acc) {
+                const collapseId = `preset-collapse-${idx}`;
+                const card = document.createElement('div');
+                card.className = 'accordion-item';
+                card.innerHTML = `
+                    <h2 class="accordion-header" id="heading-${idx}">
+                        <button class="accordion-button ${idx>0?'collapsed':''}" type="button" data-bs-toggle="collapse" data-bs-target="#${collapseId}">
+                            ${key}
+                        </button>
+                    </h2>
+                    <div id="${collapseId}" class="accordion-collapse collapse ${idx===0?'show':''}" data-bs-parent="#preset-accordion">
+                        <div class="accordion-body">
+                            <div class="list-group" id="preset-group-${idx}"></div>
+                        </div>
+                    </div>`;
+                acc.appendChild(card);
+                const list = card.querySelector(`#preset-group-${idx}`);
+                items.forEach(site=>{
+                    const btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.className = 'list-group-item list-group-item-action d-flex justify-content-between align-items-center';
+                    const nameCn = site.name; // 已含中文名
+                    btn.innerHTML = `<span><strong>${nameCn}</strong> <small class="text-muted">${site.url}</small></span>`;
+                    btn.addEventListener('click', ()=>{
+                        document.getElementById('name').value = nameCn;
+                        document.getElementById('target-url').value = site.url;
+                        if (site.selectors) {
+                            document.getElementById('title-selector').value = site.selectors.title_selector || '';
+                            document.getElementById('content-selector').value = site.selectors.content_selector || '';
+                            if (site.selectors.custom_fields) {
+                                const lines = Object.entries(site.selectors.custom_fields).map(([k,v])=>`${k}=${v}`);
+                                document.getElementById('custom-fields').value = lines.join('\n');
+                            } else {
+                                document.getElementById('custom-fields').value = '';
+                            }
+                        } else {
+                            document.getElementById('title-selector').value = '';
+                            document.getElementById('content-selector').value = '';
+                            document.getElementById('custom-fields').value = '';
+                        }
+                        if (document.getElementById('editing-job-id')) document.getElementById('editing-job-id').value = '';
+                        const saveBtn = document.querySelector('#crawl-form button[type="submit"]');
+                        if (saveBtn) saveBtn.textContent = '保存任务';
+                        document.getElementById('crawl-form').scrollIntoView({ behavior: 'smooth' });
+                    });
+                    list.appendChild(btn);
+                });
+            } else if (simpleList) {
+                simpleList.innerHTML = '';
+                items.forEach(site=>{
+                    const btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.className = 'list-group-item list-group-item-action';
+                    btn.textContent = `${site.country} / ${site.category} · ${site.name}`;
+                    btn.addEventListener('click', ()=>{
+                        document.getElementById('name').value = site.name;
+                        document.getElementById('target-url').value = site.url;
+                    });
+                    simpleList.appendChild(btn);
+                });
+            }
+        });
+    })
+    .catch(()=>{
+        if (acc) acc.innerHTML = '<div class="text-muted">预置站点加载失败</div>';
+        if (simpleList) simpleList.innerHTML = '<div class="text-muted">预置站点加载失败</div>';
     });
 }

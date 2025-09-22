@@ -1,7 +1,8 @@
 import os
+import json
 
 def load_sites_config():
-    """Load sites configuration from file"""
+    """Load sites configuration from file. Support optional 5th JSON column for selectors."""
     sites_file = os.path.join(os.path.dirname(__file__), 'sites.txt')
     sites = []
     
@@ -11,13 +12,21 @@ def load_sites_config():
                 line = line.strip()
                 if line and not line.startswith('#'):
                     parts = line.split('|')
-                    if len(parts) == 4:
-                        sites.append({
+                    if len(parts) >= 4:
+                        site = {
                             'category': parts[0],
                             'country': parts[1],
                             'name': parts[2],
                             'url': parts[3]
-                        })
+                        }
+                        if len(parts) >= 5 and parts[4]:
+                            try:
+                                site['selectors'] = json.loads(parts[4])
+                            except Exception:
+                                site['selectors'] = None
+                        else:
+                            site['selectors'] = None
+                        sites.append(site)
     
     return sites
 
@@ -42,3 +51,7 @@ def get_categories():
     sites = load_sites_config()
     categories = list(set(site['category'] for site in sites))
     return categories
+
+def get_presets():
+    """Return presets with selectors if available."""
+    return load_sites_config()

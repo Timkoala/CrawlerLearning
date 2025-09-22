@@ -26,18 +26,44 @@ class CrawlJob(db.Model):
             'updated_at': self.updated_at.isoformat() if self.updated_at else None
         }
         
-        # Add custom rules if they exist
         if self.custom_rules:
             try:
                 result['custom_rules'] = json.loads(self.custom_rules)
             except:
                 result['custom_rules'] = self.custom_rules
-                
         return result
+
+class CrawlRun(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    job_id = db.Column(db.Integer, db.ForeignKey('crawl_job.id'), nullable=False)
+    status = db.Column(db.String(20), default='running')  # running, completed, failed, stopped
+    max_depth = db.Column(db.Integer, default=1)
+    started_at = db.Column(db.DateTime, default=datetime.utcnow)
+    ended_at = db.Column(db.DateTime)
+    stats_json = db.Column(db.Text)  # scrapy stats json string
+
+    job = db.relationship('CrawlJob', backref=db.backref('runs', lazy=True))
+
+    def to_dict(self):
+        data = {
+            'id': self.id,
+            'job_id': self.job_id,
+            'status': self.status,
+            'max_depth': self.max_depth,
+            'started_at': self.started_at.isoformat() if self.started_at else None,
+            'ended_at': self.ended_at.isoformat() if self.ended_at else None,
+        }
+        if self.stats_json:
+            try:
+                data['stats'] = json.loads(self.stats_json)
+            except:
+                data['stats'] = self.stats_json
+        return data
 
 class CrawlResult(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     job_id = db.Column(db.Integer, db.ForeignKey('crawl_job.id'), nullable=False)
+    run_id = db.Column(db.Integer, nullable=True)  # optional link to CrawlRun
     url = db.Column(db.String(500), nullable=False)
     title = db.Column(db.String(200))
     content = db.Column(db.Text)
@@ -54,17 +80,15 @@ class CrawlResult(db.Model):
         result = {
             'id': self.id,
             'job_id': self.job_id,
+            'run_id': self.run_id,
             'url': self.url,
             'title': self.title,
             'content': self.content,
             'scraped_at': self.scraped_at.isoformat() if self.scraped_at else None
         }
-        
-        # Add scraped data if it exists
         if self.scraped_data:
             try:
                 result['scraped_data'] = json.loads(self.scraped_data)
             except:
                 result['scraped_data'] = self.scraped_data
-                
         return result
