@@ -1,0 +1,90 @@
+# 菲律宾和新加坡主要网站配置
+# 格式: 类别|国家|网站名称|URL
+
+government|Philippines|菲律宾政府官网|https://www.gov.ph
+government|Philippines|菲律宾总统办公室|https://president.gov.ph
+government|Philippines|菲律宾外交部|https://dfa.gov.ph
+government|Philippines|菲律宾内政部|https://dilg.gov.ph
+government|Philippines|菲律宾教育部|https://deped.gov.ph
+government|Philippines|菲律宾卫生部|https://doh.gov.ph
+government|Philippines|菲律宾国防部|https://dafp.gov.ph
+government|Philippines|菲律宾财政部|https://dbm.gov.ph
+government|Philippines|菲律宾司法部|https://doj.gov.ph
+government|Philippines|菲律宾国家统计局|https://psa.gov.ph
+
+government|Singapore|新加坡政府官网|https://www.gov.sg
+government|Singapore|新加坡总理公署|https://www.pmo.gov.sg
+government|Singapore|新加坡外交部|https://www.mfa.gov.sg
+government|Singapore|新加坡内政部|https://www.mha.gov.sg
+government|Singapore|新加坡教育部|https://www.moe.gov.sg
+government|Singapore|新加坡卫生部|https://www.moh.gov.sg
+government|Singapore|新加坡国防部|https://www.mindef.gov.sg
+government|Singapore|新加坡财政部|https://www.mof.gov.sg
+government|Singapore|新加坡律政部|https://www.mlaw.gov.sg
+government|Singapore|新加坡国家环境局|https://www.nea.gov.sg
+
+news|Philippines|菲律宾星报|https://www.philstar.com
+news|Philippines|马尼拉公报|https://www.manilabulletin.com
+news|Philippines|菲律宾每日询问者|https://www.inquirer.net
+news|Philippines|GMA新闻|https://www.gmanetwork.com/news
+news|Philippines|ABS-CBN新闻|https://news.abs-cbn.com
+news|Philippines|菲律宾太阳星报|https://www.sunstar.com.ph
+news|Philippines|商业镜报|https://businessmirror.com.ph
+news|Philippines|菲律宾每日邮报|https://www.manilatimes.net
+news|Philippines|Rappler|https://www.rappler.com
+news|Philippines|CNN菲律宾|https://cnnphilippines.com
+
+news|Singapore|海峡时报|https://www.straitstimes.com
+news|Singapore|联合早报|https://www.zaobao.com.sg
+news|Singapore|亚洲新闻台|https://www.channelnewsasia.com
+news|Singapore|今日报|https://www.todayonline.com
+news|Singapore|TODAY|https://www.today.com.sg
+news|Singapore|新加坡广播电台|https://www.radio.sg
+news|Singapore|新明日报|https://www.sinming.com
+news|Singapore|Lianhe Zaobao|https://www.lianhe.com.sg
+news|Singapore|Berita Harian|https://www.beritaharian.sg
+news|Singapore|Kwong Wah Yit Poh|https://www.kwongwah.com.my
+
+social|Philippines|Facebook|https://www.facebook.com
+social|Philippines|Twitter|https://www.twitter.com
+social|Philippines|Instagram|https://www.instagram.com
+social|Philippines|LinkedIn|https://www.linkedin.com
+social|Philippines|YouTube|https://www.youtube.com
+social|Philippines|TikTok|https://www.tiktok.com
+social|Philippines|Reddit|https://www.reddit.com
+social|Philippines|Pinterest|https://www.pinterest.com
+social|Philippines|Tumblr|https://www.tumblr.com
+social|Philippines|Snapchat|https://www.snapchat.com
+
+social|Singapore|Facebook|https://www.facebook.com
+social|Singapore|Twitter|https://www.twitter.com
+social|Singapore|Instagram|https://www.instagram.com
+social|Singapore|LinkedIn|https://www.linkedin.com
+social|Singapore|YouTube|https://www.youtube.com
+social|Singapore|TikTok|https://www.tiktok.com
+social|Singapore|Reddit|https://www.reddit.com
+social|Singapore|Pinterest|https://www.pinterest.com
+social|Singapore|Tumblr|https://www.tumblr.com
+social|Singapore|Snapchat|https://www.snapchat.com
+
+forum|Philippines|Philippines internet forums|https://www.philippinesinternetforums.com
+forum|Philippines|PinoyExchange|https://www.pinoyexchange.com
+forum|Philippines|Philippine forum|https://www.philippineforum.com
+forum|Philippines|Reddit Philippines|https://www.reddit.com/r/Philippines
+forum|Philippines|TripAdvisor Philippines|https://www.tripadvisor.com.ph
+forum|Philippines|Carousell Philippines|https://www.carousell.com.ph
+forum|Philippines|OLX Philippines|https://www.olx.ph
+forum|Philippines|Facebook Groups|https://www.facebook.com/groups
+forum|Philippines|Kaskus|https://www.kaskus.co.id
+forum|Philippines|Kompasiana|https://www.kompasiana.com
+
+forum|Singapore|Hardware Zone|https://www.hardwarezone.com.sg
+forum|Singapore|Carousell Singapore|https://www.carousell.sg
+forum|Singapore|Reddit Singapore|https://www.reddit.com/r/singapore
+forum|Singapore|Mothership|https://mothership.sg
+forum|Singapore|KiasuParents|https://www.kiasuparents.com
+forum|Singapore|PropertyGuru Forum|https://forum.propertyguru.com.sg
+forum|Singapore|SGTalk|https://sgtalk.org
+forum|Singapore|AsiaOne Forum|https://forum.asiaone.com
+forum|Singapore|The Online Citizen|https://www.theonlinecitizen.com
+forum|Singapore|Lianhe Zaobao Forum|https://forum.zaobao.com
